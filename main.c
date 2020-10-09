@@ -16,7 +16,7 @@
 #define INVALID_ROW 0xFFFFFFFF
 #define NUM_FRAMES 500
 #define GIF_NAME "level.gif"
-#define OUT_HEIGHT 50
+#define DEFAULT_OUT_HEIGHT 50
 
 
 typedef struct {
@@ -68,6 +68,8 @@ void print_row(Table *table, uint32_t row_index);
 void print_table(Table *table);
 void copy_row(Table *table, uint32_t current_row, uint32_t height, uint8_t *grid);
 char *read_file(char *file_name);
+char *parse_level(const char * const level_string, uint32_t *level_width, uint32_t *level_height);
+void print_usage(void);
 
 uint8_t *grid_create(char *level_string, uint32_t *level_width, uint32_t *level_height);
 
@@ -81,16 +83,22 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL));
 
-    int out_height_int = OUT_HEIGHT;
+    int out_height_int = DEFAULT_OUT_HEIGHT;
     int dim = DEFAULT_DIM;
     char *file_name = NULL;
+    bool print_help = false;
 
     struct opttype opts[] = {
         {"height", 'h', OPTTYPE_INT, &out_height_int},
         {"dim", 'd', OPTTYPE_INT, &dim},
         {"file", 'f', OPTTYPE_STRING, &file_name},
+        {"help", 'h', OPTTYPE_BOOL, &print_help},
     };
     fetchopts(&argc, &argv, opts);
+    if (print_help || (argc != 0)) {
+        print_usage();
+        exit(0);
+    }
 
     // we could use OPTTYPE_ULONG or something for out_height,
     // but lets just not.
@@ -107,33 +115,34 @@ int main(int argc, char *argv[]) {
     ge_GIF *gif =
         ge_new_gif(GIF_NAME, WIDTH * dim, out_height * dim, palette, 2, LOOP_SETTING);
 
-    char *level_string = NULL;
-
-    if (NULL == file_name) {
-        // calloc it just so we can free later in either case
-        level_string = calloc(1, strlen(gv_test_level) + 1);
-        strcpy(level_string, gv_test_level);
-    } else {
-        level_string = read_level(level_string, &level_width, &level_height);
-    }
+    char *level = NULL;
     uint32_t level_width = 0;
     uint32_t level_height = 0;
 
-    char *level_string = 
+    if (NULL == file_name) {
+        level = parse_level(gv_test_level, &level_width, &level_height);
+        assert(NULL != level);
+    } else {
+        char *level_string = read_file(file_name);
 
-    uint8_t *grid = calloc(1, level_width * level_height);
+        level = parse_level(level_string, &level_width, &level_height);
+        free(level_string);
 
-    uint8_t grid[WIDTH * out_height];
+        assert(NULL != level);
+    }
+
+    // GIF color grid passed to gifenc
+    uint8_t *grid = calloc(1, level_width * out_height);
 
     for (uint32_t y = 0; y < out_height; y++) {
-        for (uint32_t x = 0; x < WIDTH; x++) {
-            uint32_t index = x + y * WIDTH;
+        for (uint32_t x = 0; x < level_width; x++) {
+            uint32_t index = x + y * level_width;
 
-            grid[index] = gv_test_level[index] == '1';
+            grid[index] = level[index] == '1';
         }
     }
 
-    Table *table = table_create(WIDTH, HEIGHT, gv_test_level);
+    Table *table = table_create(level_width, level_height, level);
 
     //print_table(table);
 
@@ -142,22 +151,22 @@ int main(int argc, char *argv[]) {
 
     // fill the initial grid up with rows
     for (uint32_t row_index = 0; row_index < out_height; row_index++) {
-        scroll(WIDTH, out_height, grid);
+        scroll(level_width, out_height, grid);
 
         copy_row(table, current_row, out_height, grid);
         current_row = table_next_row(table, current_row);
     }
 
-    // start with this fill image
-    emit_frame(gif, WIDTH, out_height, (uint8_t*)grid);
+    // start with this filled image
+    emit_frame(gif, dim, level_width, out_height, (uint8_t*)grid);
 
     // run each frame- scroll up one row and fill in the last row with an
     // entry from the table
     for (uint32_t frame_index = 0; frame_index < NUM_FRAMES; frame_index++) {
-        scroll(WIDTH, out_height, grid);
+        scroll(level_width, out_height, grid);
         copy_row(table, current_row, out_height, grid);
         current_row = table_next_row(table, current_row);
-        emit_frame(gif, WIDTH, out_height, (uint8_t*)grid);
+        emit_frame(gif, dim, level_width, out_height, (uint8_t*)grid);
     }
 
     // clean up
@@ -165,56 +174,74 @@ int main(int argc, char *argv[]) {
 
     ge_close_gif(gif);
 
-    free(level_string);
+    free(grid);
+    free(level);
 
     return 0;
 }
 
-char *read_level(char *file_name, uint32_t *level_width, uint32_t *level_height) {
+void print_usage(void) {
+    printf("Usage: downgen [OPTION]...\n");
+    printf("  --file, -f FILE    Use the given file as the input.\n");
+    printf("                     The file should contain 0's and 1's, one column per\n");
+    printf("                     line, with the same number of characters in each line\n");
+    printf("  --dim,-d  N        Set the GIF dimensions (width and height in pixels of each block.\n");
+    printf("                     For example, 5 makes each cell in the output a 5x5 pixel block\n");
+    printf("                     Defaults to %d.\n", DEFAULT_DIM);
+    printf("  --height,-h N      Set the number of rows in the output image\n");
+    printf("                     Defaults to %d\n", DEFAULT_OUT_HEIGHT);
+    printf("  --help             Print this help message\n");
+    printf("\n");
+}
+
+char *parse_level(const char * const level_string, uint32_t *level_width, uint32_t *level_height) {
     assert(NULL != level_width);
     assert(NULL != level_height);
 
-
-    char *level_string_raw = read_file(file_name);
-
-    uint32_t level_len = strlen(level_string_raw);
+    uint32_t level_len = strlen(level_string);
 
     uint32_t num_level_chars = 0;
     *level_width = 0;
     *level_height = 0;
     for (uint32_t chr_index = 0; chr_index < level_len; chr_index++) {
-        if (isspace(level_string_raw[chr_index])) {
+        if (isspace(level_string[chr_index])) {
             if (*level_width == 0) {
-                level_widht = chr_index;
+                // if the level starts with a space, it is invalid
+                assert(0 != chr_index);
+
+                *level_width = chr_index;
             }
 
-            if (level_string_raw[chr_index] == '\n') {
+            if (level_string[chr_index] == '\n') {
                 *level_height = *level_height + 1;
             }
         } else {
+            if ((level_string[chr_index] != '0') &&
+                (level_string[chr_index] != '1')) {
+                fprintf(stderr, "Character '%c' is invalid in a level file!\n", level_string[chr_index]);
+                return NULL;
+            }
             num_level_chars++;
         }
     }
 
     // check for no trailing newline- in this case add one to level height
     // for the last line
-    if (!isspace(level_string_raw[level_len])) {
+    if (!isspace(level_string[level_len])) {
         *level_height = *level_height + 1;
     }
 
-    uint8_t *level = (uint8_t*)calloc(1, num_level_chrs);
-    assert(NULL != grid);
+    uint8_t *level = (uint8_t*)calloc(1, num_level_chars);
+    assert(NULL != level);
 
     uint32_t level_index = 0;
     for (uint32_t chr_index = 0; chr_index < level_len; chr_index++) {
-        if (!isspace(level_string_raw[chr_index])) {
-            level[level_index] = level_string_raw[chr_index];
+        if (!isspace(level_string[chr_index])) {
+            level[level_index] = level_string[chr_index];
             level_index++;
         }
     }
     
-    free(level_string_raw);
-
     return level;
 }
 
@@ -234,16 +261,18 @@ char *read_file(char *file_name) {
     int file_size = ftell(file);
     assert(file_size > 0);
 
-    retval = fseek(file, 0, SEEK_START);
+    retval = fseek(file, 0, SEEK_SET);
     assert(0 == retval);
 
     // allocate space for file data
-    char *file_data = (char*)calloc(1, file_size);
+    char *file_data = (char*)calloc(1, file_size + 1);
     assert(NULL != file_data);
 
     // read in full file
     int read_result = fread(file_data, 1, file_size, file);
     assert(read_result == file_size);
+
+    file_data[file_size - 1] = '\0';
 
     return file_data;
 }
