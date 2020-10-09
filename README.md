@@ -58,26 +58,8 @@ are a series of 0 and 1 characters, in same-width columns, separated by newlines
 
 A 1 shows up as a green square, and a 0 as a black square.
 
-## Code Notes
-Just some notes on the code and the process of creating this tool:
-
-
-One is that I have been getting into the habit of checking against constants by
-using the constant as the first argument to conditionals, such as
-```c
-if (NULL == file)
-```
-instead of
-```c
-if (file == NULL)
-```
-just because some safety-critical coding standards suggest this, and if it helps
-in even a small number of cases, I might as well make it a habit.
-
 ## The Name
 I've been playing a very fun game called [DownWell](https://downwellgame.com/),
 so when I was thinking of a name for this tool, the word 'down' came to mind.
 It generates levels in which one would go down.
-
-
 
