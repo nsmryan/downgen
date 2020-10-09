@@ -176,6 +176,8 @@ void generate_gif(Config *config, char *level, Table *table, Image *image) {
 
 void print_usage(void) {
     printf("Usage: downgen [OPTION]...\n");
+    printf("  Create a gif of a vertically scrolling level from a given input level\n");
+    printf("\n");
     printf("  --file, -f FILE    Use the given file as the input.\n");
     printf("                     The file should contain 0's and 1's, one column per\n");
     printf("                     line, with the same number of characters in each line\n");
