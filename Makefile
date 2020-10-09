@@ -1,10 +1,10 @@
 
 
 INC := -Ideps/optfetch -Ideps/gifenc
-CFLAGS ?= -O3 -g
+CFLAGS ?= -O0 -g
 
 downgen: deps/optfetch/optfetch.c deps/gifenc/gifenc.c main.c
-	$(CC) -o downgen $^ $(INC)
+	$(CC) $(CFLAGS) -o downgen $^ $(INC)
 
 .PHONY: clean
 clean:

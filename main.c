@@ -6,12 +6,14 @@
 #include <assert.h>
 #include <time.h>
 
+#include <ctype.h>
+
 #include "optfetch.h"
 #include "gifenc.h"
 
 
 #define DEFAULT_DIM 20
-#define SPEED 10
+#define DEFAULT_SPEED 10
 #define LOOP_SETTING 0
 #define INVALID_ROW 0xFFFFFFFF
 #define NUM_FRAMES 500
@@ -55,11 +57,12 @@ char const * const gv_test_level =
 
 
 // emit a frame into the given GIF
+//   speed is the number of 10 ms increments per frame
 //   dim is the dimensions (width and height) of each pixel, to allow larger images
 //   width is the width of the given grid of color values
 //   height is the height of the given grid of color values
 //   grid is a width * height array of indices into the gif's color palette
-void emit_frame(ge_GIF *gif, uint32_t dim, uint32_t width, uint32_t height, uint8_t *grid);
+void emit_frame(ge_GIF *gif, int speed, uint32_t dim, uint32_t width, uint32_t height, uint8_t *grid);
 
 void scroll(uint32_t width, uint32_t height, uint8_t *grid);
 uint32_t unique_rows(uint32_t width, uint32_t height, char const * const level);
@@ -87,11 +90,13 @@ int main(int argc, char *argv[]) {
     int dim = DEFAULT_DIM;
     char *file_name = NULL;
     bool print_help = false;
+    int speed = DEFAULT_SPEED;
 
     struct opttype opts[] = {
         {"height", 'h', OPTTYPE_INT, &out_height_int},
         {"dim", 'd', OPTTYPE_INT, &dim},
         {"file", 'f', OPTTYPE_STRING, &file_name},
+        {"speed", 's', OPTTYPE_INT, &speed},
         {"help", 'h', OPTTYPE_BOOL, &print_help},
     };
     fetchopts(&argc, &argv, opts);
@@ -111,9 +116,6 @@ int main(int argc, char *argv[]) {
         0xFF, 0x00, 0x00, /* 1 -> red */
         0x00, 0x00, 0xFF, /* 3 -> blue */
     };
-
-    ge_GIF *gif =
-        ge_new_gif(GIF_NAME, WIDTH * dim, out_height * dim, palette, 2, LOOP_SETTING);
 
     char *level = NULL;
     uint32_t level_width = 0;
@@ -144,6 +146,9 @@ int main(int argc, char *argv[]) {
 
     Table *table = table_create(level_width, level_height, level);
 
+    ge_GIF *gif =
+        ge_new_gif(GIF_NAME, level_width * dim, out_height * dim, palette, 2, LOOP_SETTING);
+
     //print_table(table);
 
     // initialize to a random row
@@ -158,7 +163,7 @@ int main(int argc, char *argv[]) {
     }
 
     // start with this filled image
-    emit_frame(gif, dim, level_width, out_height, (uint8_t*)grid);
+    emit_frame(gif, speed, dim, level_width, out_height, (uint8_t*)grid);
 
     // run each frame- scroll up one row and fill in the last row with an
     // entry from the table
@@ -166,7 +171,7 @@ int main(int argc, char *argv[]) {
         scroll(level_width, out_height, grid);
         copy_row(table, current_row, out_height, grid);
         current_row = table_next_row(table, current_row);
-        emit_frame(gif, dim, level_width, out_height, (uint8_t*)grid);
+        emit_frame(gif, speed, dim, level_width, out_height, (uint8_t*)grid);
     }
 
     // clean up
@@ -277,7 +282,7 @@ char *read_file(char *file_name) {
     return file_data;
 }
 
-void emit_frame(ge_GIF *gif, uint32_t dim, uint32_t width, uint32_t height, uint8_t *grid) {
+void emit_frame(ge_GIF *gif, int speed, uint32_t dim, uint32_t width, uint32_t height, uint8_t *grid) {
     for (uint32_t y = 0; y < height; y++) {
         for (uint32_t x = 0; x < width; x++) {
             uint32_t index = x + y * width;
@@ -297,7 +302,7 @@ void emit_frame(ge_GIF *gif, uint32_t dim, uint32_t width, uint32_t height, uint
         }
     }
 
-    ge_add_frame(gif, SPEED);
+    ge_add_frame(gif, speed);
 
 }
 
