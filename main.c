@@ -195,6 +195,8 @@ void print_usage(void) {
     printf("                     Defaults to %d.\n", DEFAULT_DIM);
     printf("  --height,-h N      Set the number of rows in the output image\n");
     printf("                     Defaults to %d\n", DEFAULT_OUT_HEIGHT);
+    printf("  --speed,-s N       Set the speed of the gif- 1 means 10ms per frame\n");
+    printf("                     Defaults to %d\n", DEFAULT_SPEED);
     printf("  --help             Print this help message\n");
     printf("\n");
 }
