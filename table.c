@@ -132,7 +132,7 @@ Table *table_create(uint32_t width, uint32_t height, char const * const level) {
     return table;
 }
 
-void print_table(Table *table) {
+void table_print(Table *table) {
     printf("Unique Rows:\n");
     for (uint32_t row_index = 0; row_index < table->num_rows; row_index++) {
         print_row(table, row_index);
@@ -186,14 +186,14 @@ void table_destroy(Table **table) {
 }
 
 
-void table_copy_row(Table *table, uint32_t current_row, uint32_t height, uint8_t *grid) {
+void table_copy_row(Table *table, uint32_t current_row, Image *image) {
     uint32_t bitmap = table->rows[current_row].bitmap;
     for (uint32_t index = 0; index < table->row_width; index++) {
         uint32_t mask = 1 << (table->row_width - index - 1);
         uint32_t bit = mask & bitmap;
 
-        uint32_t grid_index = table->row_width * (height - 1) + index;
-        grid[grid_index] = bit != 0;
+        uint32_t grid_index = table->row_width * (image->height - 1) + index;
+        image->data[grid_index] = bit != 0;
     }
 }
 
