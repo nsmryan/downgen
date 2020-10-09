@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <time.h>
 
+#include "optfetch.h"
 #include "gifenc.h"
 
 
@@ -53,7 +54,7 @@ char const * const gv_test_level =
     };
 
 
-void emit_frame(ge_GIF *gif, uint8_t *grid);
+void emit_frame(ge_GIF *gif, uint32_t width, uint32_t height, uint8_t *grid);
 
 void scroll(uint32_t width, uint32_t height, uint8_t *grid);
 uint32_t unique_rows(uint32_t width, uint32_t height, char const * const level);
@@ -72,6 +73,17 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL));
 
+    int out_height_int = OUT_HEIGHT;
+
+    struct opttype opts[] = {
+        {"height", 'h', OPTTYPE_INT, &out_height_int},
+    };
+    fetchopts(&argc, &argv, opts);
+
+    // we could use OPTTYPE_ULONG or something for out_height,
+    // but lets just not.
+    uint32_t out_height = out_height_int;
+
     uint8_t palette[] = 
     {
         0x00, 0x00, 0x00, /* 0 -> black */
@@ -81,11 +93,11 @@ int main(int argc, char *argv[]) {
     };
 
     ge_GIF *gif =
-        ge_new_gif(GIF_NAME, WIDTH * DIM, OUT_HEIGHT * DIM, palette, 2, LOOP_SETTING);
+        ge_new_gif(GIF_NAME, WIDTH * DIM, out_height * DIM, palette, 2, LOOP_SETTING);
 
-    uint8_t grid[WIDTH * OUT_HEIGHT];
+    uint8_t grid[WIDTH * out_height];
 
-    for (uint32_t y = 0; y < OUT_HEIGHT; y++) {
+    for (uint32_t y = 0; y < out_height; y++) {
         for (uint32_t x = 0; x < WIDTH; x++) {
             uint32_t index = x + y * WIDTH;
 
@@ -97,24 +109,30 @@ int main(int argc, char *argv[]) {
 
     //print_table(table);
 
+    // initialize to a random row
     uint32_t current_row = rand() % table->num_rows;
 
-    for (uint32_t row_index = 0; row_index < OUT_HEIGHT; row_index++) {
-        scroll(WIDTH, OUT_HEIGHT, grid);
+    // fill the initial grid up with rows
+    for (uint32_t row_index = 0; row_index < out_height; row_index++) {
+        scroll(WIDTH, out_height, grid);
 
-        copy_row(table, current_row, OUT_HEIGHT, grid);
+        copy_row(table, current_row, out_height, grid);
         current_row = table_next_row(table, current_row);
     }
 
+    // start with this fill image
+    emit_frame(gif, WIDTH, out_height, (uint8_t*)grid);
+
+    // run each frame- scroll up one row and fill in the last row with an
+    // entry from the table
     for (uint32_t frame_index = 0; frame_index < NUM_FRAMES; frame_index++) {
-        emit_frame(gif, (uint8_t*)grid);
-        scroll(WIDTH, OUT_HEIGHT, grid);
-        copy_row(table, current_row, OUT_HEIGHT, grid);
+        scroll(WIDTH, out_height, grid);
+        copy_row(table, current_row, out_height, grid);
         current_row = table_next_row(table, current_row);
+        emit_frame(gif, WIDTH, out_height, (uint8_t*)grid);
     }
 
-    emit_frame(gif, (uint8_t*)grid);
-
+    // clean up
     table_destroy(&table);
 
     ge_close_gif(gif);
@@ -122,10 +140,10 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-void emit_frame(ge_GIF *gif, uint8_t *grid) {
-    for (uint32_t y = 0; y < OUT_HEIGHT; y++) {
-        for (uint32_t x = 0; x < WIDTH; x++) {
-            uint32_t index = x + y * WIDTH;
+void emit_frame(ge_GIF *gif, uint32_t width, uint32_t height, uint8_t *grid) {
+    for (uint32_t y = 0; y < height; y++) {
+        for (uint32_t x = 0; x < width; x++) {
+            uint32_t index = x + y * width;
 
             uint32_t y_offset = y * DIM;
             uint32_t x_offset = x * DIM;
@@ -134,7 +152,7 @@ void emit_frame(ge_GIF *gif, uint8_t *grid) {
             for (uint32_t w = 0; w < DIM; w++) {
                 for (uint32_t h = 0; h < DIM; h++) {
 
-                    uint32_t pixel_index = x_offset + w + (DIM * WIDTH) * (y_offset + h);
+                    uint32_t pixel_index = x_offset + w + (DIM * width) * (y_offset + h);
 
                     gif->frame[pixel_index] = color;
                 }
