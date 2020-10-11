@@ -69,7 +69,7 @@ Image *image_create(uint32_t width, uint32_t height);
 void image_destroy(Image **image);
 
 int main(int argc, char *argv[]) {
-    assert(WIDTH <= 32);
+    assert(WIDTH <= 64);
 
     srand(time(NULL));
 
@@ -111,6 +111,12 @@ int main(int argc, char *argv[]) {
         free(level_string);
     }
     assert(NULL != level);
+
+    if (level_width > 64)
+    {
+        printf("Level width must be < 64 (was %d)!\n", level_width);
+        exit(0);
+    }
 
     Image *image = image_create(level_width, out_height);
     assert(NULL != image);

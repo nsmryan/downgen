@@ -14,11 +14,11 @@
 
 void print_row(Table *table, uint32_t row_index);
 uint32_t unique_rows(uint32_t width, uint32_t height, char const * const level);
-uint32_t bitmap(uint32_t width, char const * const row);
+Bitmap bitmap(uint32_t width, char const * const row);
 
 
-uint32_t bitmap(uint32_t width, char const * const row) {
-    uint32_t map = 0;
+Bitmap bitmap(uint32_t width, char const * const row) {
+    Bitmap map = 0;
 
     for (uint32_t index = 0; index < width; index++) {
         map = map << 1;
@@ -35,7 +35,7 @@ uint32_t unique_rows(uint32_t width, uint32_t height, char const * const level) 
     uint32_t num_reprs = 0;
 
     for (uint32_t row_index = 0; row_index < height; row_index++) {
-        uint32_t map = bitmap(width, &level[row_index * width]);
+        Bitmap map = bitmap(width, &level[row_index * width]);
 
         bool new_repr = true;
         for (uint32_t repr_index = 0; repr_index < num_reprs; repr_index++) {
@@ -54,7 +54,7 @@ uint32_t unique_rows(uint32_t width, uint32_t height, char const * const level) 
     return num_reprs;
 }
 
-uint32_t table_bitmap_index(Table *table, uint32_t bitmap) {
+uint32_t table_bitmap_index(Table *table, Bitmap bitmap) {
     for (uint32_t index = 0; index < table->num_rows; index++) {
         if (table->rows[index].bitmap == bitmap) {
             return index;
@@ -78,7 +78,7 @@ Table *table_create(uint32_t width, uint32_t height, char const * const level) {
 
     uint32_t num_reprs = 0;
     for (uint32_t row_index = 0; row_index < height; row_index++) {
-        uint32_t map = bitmap(width, &level[row_index * width]);
+        Bitmap map = bitmap(width, &level[row_index * width]);
 
         bool new_repr = true;
         for (uint32_t repr_index = 0; repr_index < num_reprs; repr_index++) {
@@ -99,15 +99,15 @@ Table *table_create(uint32_t width, uint32_t height, char const * const level) {
     table->transitions = (uint32_t*)calloc(table->num_rows, table->num_rows * sizeof(uint32_t)); 
 
     for (uint32_t row_index = 0; row_index < height; row_index++) {
-        uint32_t start_bitmap = bitmap(width, &level[row_index * width]);
+        Bitmap start_bitmap = bitmap(width, &level[row_index * width]);
 
         uint32_t next_row_index = (row_index + 1) % table->num_rows;
         uint32_t prev_row_index = row_index - 1;
         if (row_index == 0) {
             prev_row_index = table->num_rows - 1;
         }
-        uint32_t next_bitmap = bitmap(width, &level[next_row_index * width]);
-        uint32_t prev_bitmap = bitmap(width, &level[prev_row_index * width]);
+        Bitmap next_bitmap = bitmap(width, &level[next_row_index * width]);
+        Bitmap prev_bitmap = bitmap(width, &level[prev_row_index * width]);
 
         uint32_t start_index = table_bitmap_index(table, start_bitmap);
         assert(INVALID_ROW != start_index);
@@ -152,7 +152,7 @@ void table_print(Table *table) {
 void print_row(Table *table, uint32_t row_index) {
     for (uint32_t index = 0; index < table->row_width; index++) {
         uint32_t mask = 1 << (table->row_width - index - 1);
-        uint32_t bit = mask & table->rows[row_index].bitmap;
+        Bitmap bit = mask & table->rows[row_index].bitmap;
         printf("%c ", '0' + (bit != 0));
     }
     printf("\n");
@@ -187,13 +187,14 @@ void table_destroy(Table **table) {
 
 
 void table_copy_row(Table *table, uint32_t current_row, Image *image) {
-    uint32_t bitmap = table->rows[current_row].bitmap;
+    Bitmap bitmap = table->rows[current_row].bitmap;
     for (uint32_t index = 0; index < table->row_width; index++) {
         uint32_t mask = 1 << (table->row_width - index - 1);
-        uint32_t bit = mask & bitmap;
+        Bitmap bit = mask & bitmap;
+        uint8_t color = bit != 0;
 
         uint32_t grid_index = table->row_width * (image->height - 1) + index;
-        image->data[grid_index] = bit != 0;
+        image->data[grid_index] = color;
     }
 }
 
